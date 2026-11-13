@@ -1,0 +1,266 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated DYNOSHI Android Lab operator workspace profile.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID matching the document ID."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Operator display name."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["operator"],
+          "description": "Workspace access role (locked to operator on self-registration)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "DeviceRecord": {
+      "title": "DeviceRecord",
+      "description": "Cloud-synced Android device or AVD hardware profile metadata owned by an operator.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "manufacturer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "androidVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "apiLevel": {
+          "type": "integer"
+        },
+        "deviceCategory": {
+          "type": "string",
+          "enum": ["physical", "emulator_playstore", "emulator_aosp", "remote_agent", "cloud_device"]
+        },
+        "adbSerial": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "avdName": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": ["running", "stopped", "booting", "error", "offline", "unauthorized"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "name", "model", "manufacturer", "androidVersion", "apiLevel", "deviceCategory", "status", "createdAt", "updatedAt"]
+    },
+    "DiagnosticSnapshot": {
+      "title": "DiagnosticSnapshot",
+      "description": "Verified ADB diagnostic snapshot capturing adb devices, getprop, Play Store, and YouTube checks.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "adbSerial": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "adbDevicesPassed": {
+          "type": "boolean"
+        },
+        "getpropPassed": {
+          "type": "boolean"
+        },
+        "playStoreInstalled": {
+          "type": "boolean"
+        },
+        "youtubeInstalled": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "deviceId", "adbSerial", "adbDevicesPassed", "getpropPassed", "playStoreInstalled", "youtubeInstalled", "summary", "createdAt"]
+    },
+    "AiThread": {
+      "title": "AiThread",
+      "description": "Multi-turn Gemini Lab Assistant conversation thread.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "model": {
+          "type": "string",
+          "enum": ["gemini-4-hydrogen", "gemini-3.1-flash-lite"]
+        },
+        "useSearchGrounding": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "title", "model", "useSearchGrounding", "createdAt", "updatedAt"]
+    },
+    "AiMessage": {
+      "title": "AiMessage",
+      "description": "Individual message turn inside an AiThread, with optional Google Search grounding citations.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "model"]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32000
+        },
+        "sourceUrls": {
+          "type": "array",
+          "description": "Bounded up to 10 grounding citation URLs."
+        },
+        "sourceTitles": {
+          "type": "array",
+          "description": "Bounded up to 10 grounding citation titles."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "ownerId", "threadId", "role", "text", "sourceUrls", "sourceTitles", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Operator profile root document; acts as Master Gate parent for all operator lab resources."
+    },
+    "/users/{userId}/devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/DeviceRecord" },
+      "description": "Cloud-synced device registry profiles owned by the operator."
+    },
+    "/users/{userId}/diagnostics/{snapshotId}": {
+      "schema": { "$ref": "#/entities/DiagnosticSnapshot" },
+      "description": "Saved ADB hardware & package diagnostic verification snapshots."
+    },
+    "/users/{userId}/aiThreads/{threadId}": {
+      "schema": { "$ref": "#/entities/AiThread" },
+      "description": "Persistent Gemini Assistant & Search Grounding conversation threads."
+    },
+    "/users/{userId}/aiThreads/{threadId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/AiMessage" },
+      "description": "Messages belonging to a specific Gemini Assistant thread."
+    }
+  }
+}

@@ -1,0 +1,268 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Catch-All Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =====================================================
+    // Global Hardened Primitives
+    // =====================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function userRootExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function threadExistsAndOwned(userId, threadId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/aiThreads/$(threadId)) &&
+        get(/databases/$(database)/documents/users/$(userId)/aiThreads/$(threadId)).data.ownerId == userId;
+    }
+
+    // =====================================================
+    // Validation Blueprint Helpers (Called on create & update)
+    // =====================================================
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 120
+        && data.role == 'operator'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDeviceRecord(data, userId, deviceId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'name', 'model', 'manufacturer',
+          'androidVersion', 'apiLevel', 'deviceCategory', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'model', 'manufacturer',
+          'androidVersion', 'apiLevel', 'deviceCategory',
+          'adbSerial', 'avdName', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string
+        && isValidId(data.id)
+        && data.id == deviceId
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 140
+        && data.model is string && data.model.size() >= 1 && data.model.size() <= 120
+        && data.manufacturer is string && data.manufacturer.size() >= 1 && data.manufacturer.size() <= 80
+        && data.androidVersion is string && data.androidVersion.size() >= 1 && data.androidVersion.size() <= 64
+        && data.apiLevel is int && data.apiLevel >= 0 && data.apiLevel <= 100
+        && data.deviceCategory in ['physical', 'emulator_playstore', 'emulator_aosp', 'remote_agent', 'cloud_device']
+        && (!data.keys().hasAny(['adbSerial']) || (data.adbSerial is string && data.adbSerial.size() <= 128))
+        && (!data.keys().hasAny(['avdName']) || (data.avdName is string && data.avdName.size() <= 128))
+        && data.status in ['running', 'stopped', 'booting', 'error', 'offline', 'unauthorized']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDiagnosticSnapshot(data, userId, snapshotId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'deviceId', 'adbSerial',
+          'adbDevicesPassed', 'getpropPassed', 'playStoreInstalled', 'youtubeInstalled',
+          'summary', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'deviceId', 'adbSerial',
+          'adbDevicesPassed', 'getpropPassed', 'playStoreInstalled', 'youtubeInstalled',
+          'summary', 'createdAt'
+        ])
+        && data.id is string
+        && isValidId(data.id)
+        && data.id == snapshotId
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.deviceId is string && data.deviceId.size() >= 1 && data.deviceId.size() <= 128
+        && data.adbSerial is string && data.adbSerial.size() <= 128
+        && data.adbDevicesPassed is bool
+        && data.getpropPassed is bool
+        && data.playStoreInstalled is bool
+        && data.youtubeInstalled is bool
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 4000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAiThread(data, userId, threadId) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'model', 'useSearchGrounding', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'title', 'model', 'useSearchGrounding', 'createdAt', 'updatedAt'])
+        && data.id is string
+        && isValidId(data.id)
+        && data.id == threadId
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.model in ['gemini-4-hydrogen', 'gemini-3.1-flash-lite']
+        && data.useSearchGrounding is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAiMessage(data, userId, threadId, messageId) {
+      return data.keys().hasAll(['id', 'ownerId', 'threadId', 'role', 'text', 'sourceUrls', 'sourceTitles', 'createdAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'threadId', 'role', 'text', 'sourceUrls', 'sourceTitles', 'createdAt'])
+        && data.id is string
+        && isValidId(data.id)
+        && data.id == messageId
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.ownerId == request.auth.uid
+        && data.threadId is string
+        && isValidId(data.threadId)
+        && data.threadId == threadId
+        && data.role in ['user', 'model']
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 32000
+        && data.sourceUrls is list && data.sourceUrls.size() <= 10
+        && (data.sourceUrls.size() == 0 || (data.sourceUrls[0] is string && data.sourceUrls[0].size() <= 1024))
+        && data.sourceTitles is list && data.sourceTitles.size() <= 10
+        && (data.sourceTitles.size() == 0 || (data.sourceTitles[0] is string && data.sourceTitles[0].size() <= 300))
+        && data.createdAt is timestamp;
+    }
+
+    // =====================================================
+    // Collection Rules
+    // =====================================================
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().role == existing().role
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if false;
+
+      match /devices/{deviceId} {
+        allow get: if isValidId(userId) && isValidId(deviceId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow list: if isValidId(userId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(deviceId)
+          && isVerifiedOwner(userId)
+          && isValidDeviceRecord(incoming(), userId, deviceId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && userRootExists(userId);
+        allow update: if isValidId(userId) && isValidId(deviceId)
+          && isVerifiedOwner(userId)
+          && isValidDeviceRecord(incoming(), userId, deviceId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'model', 'manufacturer', 'androidVersion', 'apiLevel', 'deviceCategory', 'adbSerial', 'avdName', 'status', 'updatedAt'])
+          && userRootExists(userId);
+        allow delete: if isValidId(userId) && isValidId(deviceId)
+          && isVerifiedOwner(userId)
+          && existing().ownerId == request.auth.uid;
+      }
+
+      match /diagnostics/{snapshotId} {
+        allow get: if isValidId(userId) && isValidId(snapshotId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow list: if isValidId(userId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(snapshotId)
+          && isVerifiedOwner(userId)
+          && isValidDiagnosticSnapshot(incoming(), userId, snapshotId)
+          && incoming().createdAt == request.time
+          && userRootExists(userId);
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(snapshotId)
+          && isVerifiedOwner(userId)
+          && existing().ownerId == request.auth.uid;
+      }
+
+      match /aiThreads/{threadId} {
+        allow get: if isValidId(userId) && isValidId(threadId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow list: if isValidId(userId) && isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(threadId)
+          && isVerifiedOwner(userId)
+          && isValidAiThread(incoming(), userId, threadId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && userRootExists(userId);
+        allow update: if isValidId(userId) && isValidId(threadId)
+          && isVerifiedOwner(userId)
+          && isValidAiThread(incoming(), userId, threadId)
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'model', 'useSearchGrounding', 'updatedAt'])
+          && userRootExists(userId);
+        allow delete: if isValidId(userId) && isValidId(threadId)
+          && isVerifiedOwner(userId)
+          && existing().ownerId == request.auth.uid;
+
+        match /messages/{messageId} {
+          allow get: if isValidId(userId) && isValidId(threadId) && isValidId(messageId)
+            && isOwner(userId)
+            && existing().ownerId == request.auth.uid
+            && threadExistsAndOwned(userId, threadId);
+          allow list: if isValidId(userId) && isValidId(threadId)
+            && isOwner(userId)
+            && existing().ownerId == request.auth.uid;
+          allow create: if isValidId(userId) && isValidId(threadId) && isValidId(messageId)
+            && isVerifiedOwner(userId)
+            && isValidAiMessage(incoming(), userId, threadId, messageId)
+            && incoming().createdAt == request.time
+            && threadExistsAndOwned(userId, threadId);
+          allow update: if false;
+          allow delete: if isValidId(userId) && isValidId(threadId) && isValidId(messageId)
+            && isVerifiedOwner(userId)
+            && existing().ownerId == request.auth.uid;
+        }
+      }
+    }
+  }
+}
